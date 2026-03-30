@@ -128,7 +128,7 @@ app.post("/api/download", async (req, res) => {
         children: [
           // Header
           new Paragraph({
-            children: [new TextRun({ text: "LAUNCH READINESS ASSESSMENT", size: 18, color: "aaaaaa", bold: true, font: "Calibri" })],
+            children: [new TextRun({ text: "PRODUCT LAUNCH DISCOVERY", size: 18, color: "aaaaaa", bold: true, font: "Calibri" })],
             spacing: { after: 80 },
           }),
           new Paragraph({
@@ -212,5 +212,5 @@ app.get("*", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Launch Vetter running on port ${PORT}`);
+  console.log(`Product Launch Discovery running on port ${PORT}`);
 });

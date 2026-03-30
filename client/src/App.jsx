@@ -173,7 +173,7 @@ export default function App() {
             <span style={{ color: "#fff", fontSize: 16 }}>↗</span>
           </div>
           <div>
-            <div style={{ fontWeight: 600, fontSize: 14, color: "#111" }}>Launch Vetter</div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: "#111" }}>Product Launch Discovery</div>
             <div style={{ fontSize: 11, color: "#9ca3af", letterSpacing: "0.04em" }}>PIVOTREE GTM</div>
           </div>
         </div>
@@ -184,7 +184,7 @@ export default function App() {
         {phase === "intake" && (
           <div>
             <div style={{ marginBottom: 32 }}>
-              <h1 style={{ fontSize: 26, fontWeight: 600, color: "#111", marginBottom: 8 }}>Product Launch Vetter</h1>
+              <h1 style={{ fontSize: 26, fontWeight: 600, color: "#111", marginBottom: 8 }}>Product Launch Discovery</h1>
               <p style={{ fontSize: 14, color: "#6b7280" }}>Fill in what you know. First 5 fields required. Runs live market research across all 8 scoring dimensions with cited sources.</p>
             </div>
             {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#b91c1c" }}>{error}</div>}
