@@ -6,14 +6,21 @@ const QUESTIONS = [
   { id: "targetCustomer", label: "Who is the target customer?", placeholder: "e.g. Mid-market industrial distributors, VP eCommerce, 100–500 employees", type: "text", required: true },
   { id: "category", label: "What category does this compete in?", placeholder: "e.g. Product content management, MDM/PIM services, data enrichment", type: "text", required: true },
   { id: "geography", label: "Target geography?", placeholder: "e.g. North America, US only", type: "text", required: true },
+  { id: "deliverable", label: "What does the customer actually receive? Be specific about the deliverable.", placeholder: "e.g. Enriched product catalog with attributes, images, and descriptions loaded into their PIM", type: "textarea", required: true },
+  { id: "pricingHypothesis", label: "What's your pricing hypothesis? Structure and rough range.", placeholder: "e.g. Fixed fee per SKU batch, $15–25k per engagement, or monthly retainer $5–10k", type: "text", required: false },
+  { id: "salesMotion", label: "Is this a net new logo play, expansion into existing accounts, or both?", placeholder: "e.g. Primarily expansion — we already sell data services to these accounts", type: "text", required: false },
+  { id: "expectedDealSize", label: "Expected deal size or contract value? Rough range is fine.", placeholder: "e.g. $20–50k project, or $5k/month retainer", type: "text", required: false },
+  { id: "differentiation", label: "Why would a customer pick you over the alternatives? Even a hypothesis.", placeholder: "e.g. We have domain expertise in industrial electrical + existing relationships with key distributors", type: "textarea", required: false },
+  { id: "deliveryReadiness", label: "Can you deliver this today, or does it require hiring, partnering, or building?", placeholder: "e.g. Yes — we have a team of 4 data analysts ready. Need 1 more for scale.", type: "text", required: false },
   { id: "currentSolution", label: "How does the customer solve this today without you?", placeholder: "e.g. Manual data entry, offshore team, incumbent vendor", type: "textarea", required: false },
-  { id: "whyNow", label: "Why now? What's shifted or shifting?", placeholder: "e.g. AI is making enrichment cheaper, regulation is forcing change", type: "text", required: false },
-  { id: "existingSignals", label: "Any existing customer interest, deals, or pilots?", placeholder: "e.g. 2 prospects have asked, 1 pilot underway", type: "text", required: false },
+  { id: "marketTiming", label: "What evidence do you have that now is the right time — market signals, customer requests, or deals in motion?", placeholder: "e.g. 3 customers asked for this in Q1, AI is collapsing enrichment costs, key competitor just exited", type: "textarea", required: false },
 ];
 
 const SYSTEM_PROMPT = `You are a hard-nosed product launch analyst. Use web search to validate product ideas for B2B professional services companies. Score objectively — if an idea is weak, say so.
 
 Use web search extensively. Find: market size data, named competitors, pricing benchmarks, timing signals (funding rounds, news, regulation), ICP validation. Every factual claim must come from a real source you searched.
+
+The user has provided details including: the offer name, problem, target customer, category, geography, deliverable, pricing hypothesis, sales motion, expected deal size, differentiation hypothesis, delivery readiness, current customer solutions, and market timing evidence. Use all of this to inform scoring — especially differentiation, offer viability, and monetization.
 
 Return ONLY valid JSON. No markdown, no backticks, no preamble. Raw JSON only.
 
@@ -49,11 +56,11 @@ Score ALL 8 dimensions in order:
 1. Problem Clarity — documented real problem with market evidence?
 2. Market Size — measurable TAM signal, growing or shrinking?
 3. Competitive Landscape — how crowded, named players, what they charge?
-4. Timing and Why Now — macro tailwind, trigger event, market shift?
+4. Timing and Why Now — macro tailwind, trigger event, market shift? Use the market timing evidence provided.
 5. ICP Definition — specific and reachable buyer?
-6. Monetization Evidence — people paying for this category today, at what price?
-7. Differentiation Potential — defensible white space?
-8. Offer Viability — can this be scoped, priced, and delivered as a B2B service?
+6. Monetization Evidence — people paying for this category today, at what price? Compare against the pricing hypothesis provided.
+7. Differentiation Potential — defensible white space? Score against the differentiation hypothesis provided.
+8. Offer Viability — can this be scoped, priced, and delivered? Factor in the deliverable definition, deal size, sales motion, and delivery readiness provided.
 
 GREEN = strong evidence, clear signal, low concern
 YELLOW = partial signal, gaps exist, needs validation
