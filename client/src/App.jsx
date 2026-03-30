@@ -120,80 +120,33 @@ export default function App() {
     }
   };
 
-  const downloadReport = () => {
+  const downloadReport = async () => {
     if (!results) return;
     const r = results;
     const offerName = inputs.offerName || "Product Idea";
     const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-    const vc = VC[r.overallVerdict] || VC.red;
-    const sc = (s) => SC[s] || SC.red;
 
-    const html = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<title>Launch Readiness: ${offerName}</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#fff;color:#111;max-width:960px;margin:0 auto;padding:48px 40px;font-size:14px;line-height:1.6}
-.header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:20px;margin-bottom:32px}
-.header h1{font-size:26px;font-weight:700}
-.meta{font-size:12px;color:#888;text-align:right}
-.verdict{background:${vc.bg};border-left:4px solid ${vc.border};padding:20px 24px;border-radius:4px;margin-bottom:36px}
-.verdict-label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${vc.text};margin-bottom:8px}
-.sl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#999;margin:32px 0 16px}
-.scores-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:36px}
-.sc{background:#fafafa;border:1px solid #e5e7eb;border-radius:8px;padding:16px}
-.sc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:12px}
-.badge{font-size:10px;font-weight:700;letter-spacing:.08em;padding:3px 9px;border-radius:20px;color:#fff;white-space:nowrap}
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:36px}
-.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:36px}
-.box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px}
-.box h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin-bottom:8px}
-.footer{border-top:1px solid #e5e7eb;padding-top:16px;margin-top:16px;font-size:11px;color:#bbb;display:flex;justify-content:space-between}
-</style></head><body>
-<div class="header">
-  <div>
-    <div style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#aaa;margin-bottom:6px">Launch Readiness Assessment</div>
-    <h1>${offerName}</h1>
-  </div>
-  <div class="meta"><div>Pivotree GTM</div><div>${date}</div></div>
-</div>
-<div class="verdict">
-  <div class="verdict-label">${vc.label}</div>
-  <div style="font-size:15px;line-height:1.7">${r.verdictSummary}</div>
-</div>
-<div class="sl">Dimension Scores</div>
-<div class="scores-grid">
-${r.scores.map((s) => {
-  const c = sc(s.score);
-  return `<div class="sc" style="border-top:3px solid ${c.badge}">
-  <div class="sc-top"><strong style="font-size:13px">${s.dimension}</strong><span class="badge" style="background:${c.badge}">${c.label}</span></div>
-  <div style="font-size:12px;color:#444;margin-bottom:6px;line-height:1.5">${s.finding}</div>
-  ${s.signal ? `<div style="font-size:11px;color:#777;font-style:italic;margin-bottom:8px">${s.signal}</div>` : ""}
-  <div style="font-size:11px;border-top:1px solid #e5e7eb;padding-top:8px;color:#555"><strong>Next:</strong> ${s.recommendation}</div>
-</div>`;
-}).join("")}
-</div>
-<div class="two-col">
-  <div class="box"><h4>Top Strengths</h4><ul style="padding-left:16px">${(r.topStrengths || []).map((s) => `<li style="font-size:12px;color:#444;margin-bottom:5px">${s}</li>`).join("")}</ul></div>
-  <div class="box"><h4>Top Risks</h4><ul style="padding-left:16px">${(r.topRisks || []).map((s) => `<li style="font-size:12px;color:#444;margin-bottom:5px">${s}</li>`).join("")}</ul></div>
-</div>
-<div class="three-col">
-  <div class="box"><h4>Market Size</h4><p style="font-size:12px;color:#444;line-height:1.5">${r.marketSizeSignal || ""}</p></div>
-  <div class="box"><h4>Pricing Benchmark</h4><p style="font-size:12px;color:#444;line-height:1.5">${r.pricingBenchmark || ""}</p></div>
-  <div class="box"><h4>Named Competitors</h4><p style="font-size:12px;color:#444;line-height:1.5">${(r.competitorsFound || []).join(", ")}</p></div>
-</div>
-<div class="footer"><span>Pivotree GTM · Product Launch Vetting</span><span>${date}</span></div>
-</body></html>`;
+    try {
+      const resp = await fetch("/api/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offerName, date, ...r }),
+      });
 
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `launch-readiness-${offerName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      if (!resp.ok) throw new Error("Download failed");
+
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `launch-readiness-${offerName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download error:", err);
+    }
   };
 
   return (
