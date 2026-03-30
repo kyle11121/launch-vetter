@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import path from "path";
 
@@ -9,18 +8,13 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json({ limit: "2mb" }));
-
-// Serve built React app
+app.use(express.json({ limit: "4mb" }));
 app.use(express.static(path.join(__dirname, "client/dist")));
 
-// Proxy route — keeps API key server-side
+// Proxy — keeps API key server-side
 app.post("/api/analyze", async (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
-  }
-
+  if (!apiKey) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -28,11 +22,9 @@ app.post("/api/analyze", async (req, res) => {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
-        "anthropic-beta": "interleaved-thinking-2025-05-14"
       },
       body: JSON.stringify(req.body),
     });
-
     const data = await response.json();
     res.json(data);
   } catch (err) {
@@ -40,118 +32,171 @@ app.post("/api/analyze", async (req, res) => {
   }
 });
 
-// Download endpoint — generates .docx from results JSON
+// Download — generates .docx with sources
 app.post("/api/download", async (req, res) => {
   try {
-    const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType, ShadingType } = await import("docx");
+    const {
+      Document, Packer, Paragraph, TextRun, HeadingLevel,
+      BorderStyle, ExternalHyperlink, UnderlineType
+    } = await import("docx");
 
-    const { offerName, date, verdictSummary, overallVerdict, scores, topStrengths, topRisks, competitorsFound, marketSizeSignal, pricingBenchmark } = req.body;
+    const {
+      offerName, date, verdictSummary, overallVerdict,
+      scores, topStrengths, topRisks, competitorsFound,
+      marketSizeSignal, pricingBenchmark, sources
+    } = req.body;
 
-    const VERDICT_LABEL = { green: "GO — Strong Idea", yellow: "PROCEED WITH CAUTION", red: "STOP — Major Gaps" };
-    const SCORE_LABEL = { green: "GREEN", yellow: "YELLOW", red: "RED" };
+    const VERDICT_LABEL = {
+      green: "GO — Strong Idea",
+      yellow: "PROCEED WITH CAUTION",
+      red: "STOP — Major Gaps"
+    };
+    const SCORE_COLOR = {
+      green: "16a34a",
+      yellow: "ca8a04",
+      red: "dc2626"
+    };
 
-    const heading = (text, level = HeadingLevel.HEADING_2) => new Paragraph({
-      text, heading: level,
-      spacing: { before: 300, after: 100 },
-    });
-
-    const body = (text, bold = false) => new Paragraph({
-      children: [new TextRun({ text, bold, size: 22, font: "Calibri" })],
-      spacing: { after: 80 },
-    });
-
-    const label = (text) => new Paragraph({
+    const sectionLabel = (text) => new Paragraph({
       children: [new TextRun({ text: text.toUpperCase(), bold: true, size: 18, color: "888888", font: "Calibri" })],
-      spacing: { before: 200, after: 60 },
+      spacing: { before: 320, after: 80 },
     });
 
-    const scoreSection = (s) => [
-      new Paragraph({
+    const bodyPara = (text) => new Paragraph({
+      children: [new TextRun({ text: text || "—", size: 22, font: "Calibri" })],
+      spacing: { after: 100 },
+    });
+
+    const scoreSection = (s) => {
+      const color = SCORE_COLOR[s.score] || "dc2626";
+      const label = (s.score || "").toUpperCase();
+      return [
+        new Paragraph({
+          children: [
+            new TextRun({ text: s.dimension, bold: true, size: 24, font: "Calibri" }),
+            new TextRun({ text: "  " }),
+            new TextRun({ text: `[${label}]`, bold: true, size: 20, color, font: "Calibri" }),
+          ],
+          spacing: { before: 260, after: 80 },
+        }),
+        bodyPara(s.finding),
+        ...(s.signal ? [new Paragraph({
+          children: [new TextRun({ text: s.signal, italics: true, size: 20, color: "888888", font: "Calibri" })],
+          spacing: { after: 80 },
+        })] : []),
+        new Paragraph({
+          children: [
+            new TextRun({ text: "Next: ", bold: true, size: 20, font: "Calibri" }),
+            new TextRun({ text: s.recommendation || "", size: 20, font: "Calibri" }),
+          ],
+          spacing: { after: 100 },
+          border: { top: { style: BorderStyle.SINGLE, size: 2, color: "e5e7eb" } },
+        }),
+      ];
+    };
+
+    const sourceItems = (sources || []).map((src, i) => {
+      const linkRun = new ExternalHyperlink({
+        link: src.url,
         children: [
-          new TextRun({ text: s.dimension, bold: true, size: 24, font: "Calibri" }),
-          new TextRun({ text: `  ${SCORE_LABEL[s.score] || s.score.toUpperCase()}`, bold: true, size: 20, color: s.score === "green" ? "16a34a" : s.score === "yellow" ? "ca8a04" : "dc2626", font: "Calibri" }),
+          new TextRun({
+            text: src.title || src.url,
+            style: "Hyperlink",
+            size: 20,
+            font: "Calibri",
+            color: "2563eb",
+            underline: { type: UnderlineType.SINGLE },
+          }),
         ],
-        spacing: { before: 240, after: 60 },
-      }),
-      body(s.finding),
-      ...(s.signal ? [new Paragraph({ children: [new TextRun({ text: s.signal, italics: true, size: 20, color: "888888", font: "Calibri" })], spacing: { after: 60 } })] : []),
-      new Paragraph({
-        children: [new TextRun({ text: "Next: ", bold: true, size: 20, font: "Calibri" }), new TextRun({ text: s.recommendation, size: 20, font: "Calibri" })],
-        spacing: { after: 80 },
-        border: { top: { style: BorderStyle.SINGLE, size: 1, color: "e5e7eb" } },
-        indent: { left: 0 },
-      }),
-    ];
+      });
+      return new Paragraph({
+        children: [
+          new TextRun({ text: `${i + 1}. `, bold: true, size: 20, font: "Calibri" }),
+          linkRun,
+          new TextRun({ text: src.supports ? `  —  ${src.supports}` : "", size: 18, color: "888888", font: "Calibri" }),
+        ],
+        spacing: { after: 100 },
+        indent: { left: 360 },
+      });
+    });
+
+    const verdictColor = SCORE_COLOR[overallVerdict] || "dc2626";
 
     const doc = new Document({
-      styles: {
-        default: {
-          document: { run: { font: "Calibri", size: 22 } },
-        },
-      },
       sections: [{
         properties: { page: { margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 } } },
         children: [
-          // Title block
+          // Header
           new Paragraph({
-            children: [new TextRun({ text: "LAUNCH READINESS ASSESSMENT", size: 18, color: "999999", bold: true, font: "Calibri" })],
+            children: [new TextRun({ text: "LAUNCH READINESS ASSESSMENT", size: 18, color: "aaaaaa", bold: true, font: "Calibri" })],
             spacing: { after: 80 },
           }),
           new Paragraph({
-            children: [new TextRun({ text: offerName || "Product Idea", bold: true, size: 44, font: "Calibri" })],
-            spacing: { after: 60 },
+            children: [new TextRun({ text: offerName || "Product Idea", bold: true, size: 48, font: "Calibri" })],
+            spacing: { after: 80 },
           }),
           new Paragraph({
             children: [
               new TextRun({ text: "Pivotree GTM  ·  ", size: 18, color: "999999", font: "Calibri" }),
               new TextRun({ text: date || new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }), size: 18, color: "999999", font: "Calibri" }),
             ],
-            spacing: { after: 360 },
-            border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "111111" } },
+            spacing: { after: 400 },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "111111" } },
           }),
 
           // Verdict
-          label("Overall Verdict"),
+          sectionLabel("Overall Verdict"),
           new Paragraph({
-            children: [new TextRun({ text: VERDICT_LABEL[overallVerdict] || overallVerdict?.toUpperCase() || "—", bold: true, size: 26, color: overallVerdict === "green" ? "16a34a" : overallVerdict === "yellow" ? "ca8a04" : "dc2626", font: "Calibri" })],
-            spacing: { after: 100 },
+            children: [new TextRun({ text: VERDICT_LABEL[overallVerdict] || (overallVerdict || "").toUpperCase(), bold: true, size: 28, color: verdictColor, font: "Calibri" })],
+            spacing: { after: 120 },
           }),
-          body(verdictSummary),
+          bodyPara(verdictSummary),
 
           // Scores
-          label("Dimension Scores"),
+          sectionLabel("Dimension Scores"),
           ...(scores || []).flatMap(scoreSection),
 
           // Strengths
-          label("Top Strengths"),
+          sectionLabel("Top Strengths"),
           ...(topStrengths || []).map(s => new Paragraph({
-            children: [new TextRun({ text: `• ${s}`, size: 22, font: "Calibri" })],
+            children: [new TextRun({ text: `•  ${s}`, size: 22, font: "Calibri" })],
             spacing: { after: 80 },
             indent: { left: 360 },
           })),
 
           // Risks
-          label("Top Risks"),
+          sectionLabel("Top Risks"),
           ...(topRisks || []).map(r => new Paragraph({
-            children: [new TextRun({ text: `• ${r}`, size: 22, font: "Calibri" })],
+            children: [new TextRun({ text: `•  ${r}`, size: 22, font: "Calibri" })],
             spacing: { after: 80 },
             indent: { left: 360 },
           })),
 
           // Market Intel
-          label("Market Intelligence"),
-          new Paragraph({ children: [new TextRun({ text: "Market Size", bold: true, size: 22, font: "Calibri" })], spacing: { before: 160, after: 40 } }),
-          body(marketSizeSignal || "—"),
-          new Paragraph({ children: [new TextRun({ text: "Pricing Benchmark", bold: true, size: 22, font: "Calibri" })], spacing: { before: 160, after: 40 } }),
-          body(pricingBenchmark || "—"),
-          new Paragraph({ children: [new TextRun({ text: "Named Competitors", bold: true, size: 22, font: "Calibri" })], spacing: { before: 160, after: 40 } }),
-          body((competitorsFound || []).join(", ") || "—"),
+          sectionLabel("Market Intelligence"),
+          new Paragraph({ children: [new TextRun({ text: "Market Size", bold: true, size: 22, font: "Calibri" })], spacing: { before: 160, after: 60 } }),
+          bodyPara(marketSizeSignal),
+          new Paragraph({ children: [new TextRun({ text: "Pricing Benchmark", bold: true, size: 22, font: "Calibri" })], spacing: { before: 160, after: 60 } }),
+          bodyPara(pricingBenchmark),
+          new Paragraph({ children: [new TextRun({ text: "Named Competitors", bold: true, size: 22, font: "Calibri" })], spacing: { before: 160, after: 60 } }),
+          bodyPara((competitorsFound || []).join(", ")),
+
+          // Sources
+          ...(sources && sources.length > 0 ? [
+            sectionLabel("Sources"),
+            new Paragraph({
+              children: [new TextRun({ text: "All findings sourced from live web research conducted during this analysis.", size: 18, color: "888888", italics: true, font: "Calibri" })],
+              spacing: { after: 120 },
+            }),
+            ...sourceItems,
+          ] : []),
         ],
       }],
     });
 
     const buffer = await Packer.toBuffer(doc);
-    const filename = `launch-readiness-${(offerName || "report").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}.docx`;
+    const slug = (offerName || "report").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const filename = `launch-readiness-${slug}.docx`;
 
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -162,7 +207,6 @@ app.post("/api/download", async (req, res) => {
   }
 });
 
-// Fallback to React app for all other routes
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "client/dist/index.html"));
 });
